@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo y Control Bluetooth</title>
+    <style>
+        /* Estilos CSS (Modificados para la etiqueta de desarrolladores y termómetro) */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); position: relative; } /* Añadido position: relative */
+        
+        /* ESTILO AÑADIDO: Desarrolladores */
+        #developer-tag {
+            position: absolute;
+            top: 10px; /* Ajuste vertical */
+            left: 20px; /* Ajuste horizontal */
+            font-size: 0.75em; /* Pequeño */
+            color: #6c757d; /* Color gris suave para que sea visible pero discreto */
+            font-weight: bold;
+        }
+
+        h1, h2 { text-align: center; color: #007bff; }
+        .section { margin-top: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background-color: #fafafa; }
+        .sensor-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; text-align: center; }
+        .thermometer-container { padding: 15px; border: 1px solid #ccc; border-radius: 5px; background-color: #fff; }
+        /* ESTILO AÑADIDO: Termómetro */
+        .temperature-emoji { font-size: 1.5em; vertical-align: middle; margin-right: 5px; } 
+
+        .temperature-value { font-size: 2.5em; font-weight: bold; margin: 10px 0; color: #dc3545; }
+        .label { font-size: 1em; color: #555; min-height: 40px; }
+        #average-temp { text-align: center; font-size: 3em; font-weight: bold; color: #28a745; padding: 15px; border: 2px solid #28a745; border-radius: 8px; display: inline-block; margin: 15px auto; width: 50%; display: block; }
+        
+        /* [El resto de los estilos CSS se mantiene igual] */
+        .actuator-control { display: flex; justify-content: space-around; align-items: center; margin-top: 20px; }
+        .mode-selection button { padding: 10px 20px; margin: 0 5px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: background-color 0.3s; }
+        #mode-auto { background-color: #007bff; color: white; }
+        #mode-manual { background-color: #6c757d; color: white; }
+        .mode-selection .active { box-shadow: 0 0 0 3px #ffc107; }
+        .manual-buttons { display: flex; flex-direction: column; gap: 10px; padding: 10px; border: 1px dashed #ccc; border-radius: 5px; align-items: center; }
+        .manual-buttons button { padding: 8px 15px; width: 120px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-on { background-color: #28a745; color: white; }
+        .btn-off { background-color: #dc3545; color: white; }
+        .manual-buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .status-indicator { text-align: center; margin-top: 20px; }
+        .indicator { display: inline-block; padding: 10px 20px; margin: 0 10px; border-radius: 5px; font-weight: bold; min-width: 100px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); }
+        .status-ON { background-color: #28a745; color: white; }
+        .status-OFF { background-color: #dc3545; color: white; } /* Cambiado a rojo para OFF */
+        #connect-btn { padding: 10px 30px; font-size: 1.1em; background-color: #ffc107; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; }
+        #connect-btn:hover { background-color: #e0b435; }
+        #connection-status { margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="developer-tag">
+        Desarrolladores: Congo, Jaja, Freire.
+    </div>
+
+    <div class="container">
+        <h1>Sistema de Monitoreo y Control BT 📱</h1>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button onclick="connectBluetooth()" id="connect-btn">
+                Conectar a ESP32 por Bluetooth
+            </button>
+            <div id="connection-status" style="color: #dc3545;">Desconectado</div>
+        </div>
+
+        <div class="section">
+            <h2><span class="temperature-emoji">🌡️</span> Lectura Individual de Sensores Dallas</h2>
+            <div class="sensor-grid" id="sensor-readings">
+                </div>
+            
+            <hr>
+            
+            <h2><span class="temperature-emoji">🌡️</span> Temperatura Promedio General</h2>
+            <div id="average-temp-container">
+                <span id="average-temp">--°C</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Control de Actuadores</h2>
+            
+            <div class="actuator-control">
+                <h3>Modo de Operación:</h3>
+                <div class="mode-selection">
+                    <button id="mode-auto" class="active">Automático</button>
+                    <button id="mode-manual">Manual</button>
+                </div>
+            </div>
+
+            <div class="actuator-control">
+                <div class="manual-buttons">
+                    <h4>Ventilador</h4>
+                    <button class="btn-on" id="fan-on" onclick="setManualActuator('fan', 'ON')">Encender</button>
+                    <button class="btn-off" id="fan-off" onclick="setManualActuator('fan', 'OFF')">Apagar</button>
+                </div>
+
+                <div class="manual-buttons">
+                    <h4>Calefacción</h4>
+                    <button class="btn-on" id="heat-on" onclick="setManualActuator('heat', 'ON')">Encender</button>
+                    <button class="btn-off" id="heat-off" onclick="setManualActuator('heat', 'OFF')">Apagar</button>
+                </div>
+            </div>
+
+            <div class="status-indicator">
+                <hr>
+                <h3>Estado Actual de Actuadores</h3>
+                <div class="indicator status-OFF" id="fan-status">Ventilador: OFF</div>
+                <div class="indicator status-OFF" id="heat-status">Calefacción: OFF</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Etiquetas para los sensores
+        const SENSOR_LABELS = [
+            "Motor Principal", 
+            "Cuarto de Máquinas", 
+            "Cuarto de Bombas", 
+            "Cuarto de Comunicación"
+        ];
+        
+        // Estado inicial
+        let sensorTemperatures = [0.0, 0.0, 0.0, 0.0]; 
+        let operatingMode = 'auto'; // 'auto' o 'manual'
+        let actuatorStatus = { fan: 'OFF', heat: 'OFF' };
+        
+        // --- Web Bluetooth Variables ---
+        let device;
+        let characteristicRX; 
+        const SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb'; 
+        const CHARACTERISTIC_UUID_RX = '0000ffe1-0000-1000-8000-00805f9b34fb'; 
+
+        // [El resto de las funciones Bluetooth se mantiene igual]
+        async function connectBluetooth() {
+            try {
+                // Estado: Buscando
+                document.getElementById('connection-status').textContent = "Buscando dispositivo...";
+                document.getElementById('connection-status').style.color = "#ffc107"; // Amarillo
+
+                // Solicitar el dispositivo
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }],
+                    optionalServices: [SERVICE_UUID]
+                });
+                
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+
+                // Conectar
+                const server = await device.gatt.connect();
+                const primaryService = await server.getPrimaryService(SERVICE_UUID);
+
+                // Obtener Característica de Lectura/Escritura (RX/TX)
+                characteristicRX = await primaryService.getCharacteristic(CHARACTERISTIC_UUID_RX);
+                characteristicRX.addEventListener('characteristicvaluechanged', handleSensorData);
+                await characteristicRX.startNotifications();
+                
+                // Estado: Conectado
+                document.getElementById('connection-status').textContent = "¡Conectado a " + device.name + "!";
+                document.getElementById('connection-status').style.color = "#28a745"; // Verde
+                alert("Conexión Bluetooth exitosa con el ESP32.");
+
+            } catch (error) {
+                console.error('Error al conectar Bluetooth:', error);
+                document.getElementById('connection-status').textContent = "Desconectado";
+                document.getElementById('connection-status').style.color = "#dc3545"; // Rojo
+                alert('Error de conexión. Asegúrate de que el ESP32 esté encendido y Web Bluetooth esté disponible (usa HTTPS).');
+            }
+        }
+
+        function onDisconnected(event) {
+            console.log('Dispositivo desconectado: ' + event.target.name);
+            alert('¡El ESP32 se ha desconectado!');
+            document.getElementById('connection-status').textContent = "Desconectado";
+            document.getElementById('connection-status').style.color = "#dc3545"; // Rojo
+        }
+
+        function handleSensorData(event) {
+            const value = event.target.value;
+            const decoder = new TextDecoder('utf-8');
+            const dataString = decoder.decode(value).trim();
+            
+            const temps = dataString.split(',').map(s => parseFloat(s.trim()));
+
+            if (temps.length === 4 && !temps.includes(NaN)) {
+                sensorTemperatures = temps;
+                updateSensorDisplay();
+            } else {
+                console.warn("Datos de temperatura inválidos recibidos:", dataString);
+            }
+        }
+        
+        async function sendCommand(command) {
+            if (!characteristicRX || operatingMode !== 'manual') { 
+                return;
+            }
+            try {
+                const encoder = new TextEncoder('utf-8');
+                await characteristicRX.writeValue(encoder.encode(command + '\n')); 
+                console.log('Comando enviado:', command);
+            } catch (error) {
+                console.error('Error al enviar comando:', error);
+            }
+        }
+
+        // ---------------------------------------------------
+        // 2. LÓGICA DE CONTROL (Modificada la función initializeSensors)
+        // ---------------------------------------------------
+        
+        function initializeSensors() {
+            const container = document.getElementById('sensor-readings');
+            container.innerHTML = '';
+            SENSOR_LABELS.forEach((label, index) => {
+                const tempContainer = document.createElement('div');
+                tempContainer.className = 'thermometer-container';
+                tempContainer.innerHTML = `
+                    <div class="label">Sensor ${index + 1}: **${label}**</div>
+                    <div class="temperature-value" id="temp-s${index + 1}">
+                        <span class="temperature-emoji">🌡️</span> --°C
+                    </div>
+                `;
+                container.appendChild(tempContainer);
+            });
+            updateSensorDisplay();
+        }
+
+        function calculateAverage() {
+            const sum = sensorTemperatures.reduce((a, b) => a + b, 0);
+            return sum / sensorTemperatures.length;
+        }
+
+        function updateSensorDisplay() {
+            const average = calculateAverage();
+            sensorTemperatures.forEach((temp, index) => {
+                // CAMBIO 5: Asegurar que el emoji también aparezca al actualizar
+                document.getElementById(`temp-s${index + 1}`).innerHTML = `<span class="temperature-emoji">🌡️</span> ${temp.toFixed(1)}°C`;
+            });
+
+            // CAMBIO 6: Asegurar que el emoji también aparezca en el promedio
+            document.getElementById('average-temp').innerHTML = `<span class="temperature-emoji">🌡️</span> ${average.toFixed(1)}°C`;
+            
+            if (operatingMode === 'auto') {
+                autoControlActuators(average);
+            }
+            
+            updateActuatorStatusDisplay();
+        }
+        
+        // [El resto de las funciones se mantiene igual]
+        function autoControlActuators(temp) {
+            let fanState = 'OFF';
+            let heatState = 'OFF';
+            
+            if (temp >= 25) { 
+                fanState = 'ON';
+                heatState = 'OFF';
+            } else if (temp >= 21 && temp <= 24) { 
+                fanState = 'OFF';
+                heatState = 'OFF';
+            } else if (temp >= 15 && temp <= 20) { 
+                fanState = 'OFF';
+                heatState = 'ON';
+            }
+            
+            if (actuatorStatus.fan !== fanState) {
+                actuatorStatus.fan = fanState;
+            }
+            if (actuatorStatus.heat !== heatState) {
+                actuatorStatus.heat = heatState;
+            }
+        }
+
+        document.getElementById('mode-auto').addEventListener('click', () => setOperatingMode('auto'));
+        document.getElementById('mode-manual').addEventListener('click', () => setOperatingMode('manual'));
+
+        function setOperatingMode(mode) {
+            operatingMode = mode;
+            document.getElementById('mode-auto').classList.toggle('active', mode === 'auto');
+            document.getElementById('mode-manual').classList.toggle('active', mode === 'manual');
+            
+            toggleManualButtons(mode === 'auto'); 
+            
+            if (mode === 'auto') {
+                autoControlActuators(calculateAverage());
+            } 
+            updateActuatorStatusDisplay();
+        }
+        
+        function toggleManualButtons(disable) {
+            document.getElementById('fan-on').disabled = disable;
+            document.getElementById('fan-off').disabled = disable;
+            document.getElementById('heat-on').disabled = disable;
+            document.getElementById('heat-off').disabled = disable;
+        }
+
+        function setManualActuator(actuator, state) {
+            if (operatingMode === 'manual') {
+                actuatorStatus[actuator] = state;
+                updateActuatorStatusDisplay();
+                
+                const command = `${actuator.toUpperCase()}_${state.toUpperCase()}`;
+                sendCommand(command); 
+                
+            } else {
+                alert("Para control manual, debe seleccionar el modo 'Manual'.");
+            }
+        }
+
+        function updateActuatorStatusDisplay() {
+            const fanElement = document.getElementById('fan-status');
+            const heatElement = document.getElementById('heat-status');
+            
+            fanElement.textContent = `Ventilador: ${actuatorStatus.fan}`;
+            fanElement.className = `indicator status-${actuatorStatus.fan}`;
+
+            heatElement.textContent = `Calefacción: ${actuatorStatus.heat}`;
+            heatElement.className = `indicator status-${actuatorStatus.heat}`;
+            
+            const modeText = operatingMode === 'auto' ? " (Control Automático)" : " (Control Manual)";
+            fanElement.title = `Estado: ${actuatorStatus.fan}${modeText}`;
+            heatElement.title = `Estado: ${actuatorStatus.heat}${modeText}`;
+        }
+
+        // ---------------------------------------------------
+        // INICIO
+        // ---------------------------------------------------
+        window.onload = function() {
+            initializeSensors();
+            setOperatingMode('auto'); 
+        };
+        
+    </script>
+</body>
+</html>
